@@ -2,7 +2,7 @@ import { onRequest } from 'firebase-functions/v2/https'
 import * as admin from 'firebase-admin'
 import express = require('express')
 import { createUser, getCurrentUser } from './controllers/UserController'
-import { getListOfMajors } from './controllers/MajorsController'
+import { getCurrentMajor, getListOfMajors } from './controllers/MajorsController'
 
 export const USER_COLLECTION = 'Users'
 export const MAJOR_COLLECTION = 'Majors'
@@ -15,5 +15,6 @@ app.get('/get_current_user', getCurrentUser as any)
 app.post('/create_user', createUser as any)
 
 app.get('/get_majors', getListOfMajors as any)
+app.get('/get_current_major', getCurrentMajor as any)
 
 exports.api = onRequest(app)
