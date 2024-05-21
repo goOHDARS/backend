@@ -19,18 +19,19 @@ module.exports = {
   },
   ignorePatterns: [
     '/lib/**/*', // Ignore built files.
+    '.eslintrc.js',
   ],
   plugins: ['@typescript-eslint', 'import'],
   rules: {
-    'quotes': ['error', 'single'],
+    quotes: ['error', 'single'],
     'import/no-unresolved': 0,
-    'indent': ['error', 2],
+    indent: ['error', 2, { SwitchCase: 1 }],
     '@typescript-eslint/explicit-module-boundary-types': 0,
     '@typescript-eslint/no-explicit-any': 0,
     '@typescript-eslint/no-unused-vars': 0,
     '@typescript-eslint/ban-ts-comment': 0,
     'no-console': 0,
-    'semi': 'off',
+    semi: ['error', 'never'],
     'object-curly-spacing': 'off',
     'max-len': ['error', { code: 100 }],
   },
