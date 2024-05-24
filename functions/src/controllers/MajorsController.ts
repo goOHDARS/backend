@@ -4,17 +4,22 @@ import * as admin from 'firebase-admin'
 import { MAJOR_COLLECTION, USER_COLLECTION } from '..'
 import validateFirebaseIdToken from '../middleware/validation'
 
+const getMajors = async () => {
+  const majorRefList = await admin
+    .firestore()
+    .collection(MAJOR_COLLECTION)
+    .listDocuments()
+
+  const majorDocs = await Promise.all(
+    majorRefList.map((docRef) => docRef.get())
+  )
+  return majorDocs.map((doc) => doc.data()?.name)
+}
+
+
 export const getListOfMajors = async (request: Request, response: Response) => {
   try {
-    const majorRefListPromise = await admin
-      .firestore()
-      .collection(MAJOR_COLLECTION)
-      .listDocuments()
-    const majorPromises = await Promise.all(
-      majorRefListPromise.map((el) => el.get())
-    )
-    const majors = majorPromises.map((el) => el.data()?.name)
-
+    const majors = await getMajors()
     response.status(200).send(majors)
   } catch (err) {
     response.status(500).send({ error: err })
@@ -27,14 +32,7 @@ export const getCurrentMajor = async (request: Request, response: Response) => {
   if (!uid) return
 
   try {
-    const majorRefListPromise = await admin
-      .firestore()
-      .collection(MAJOR_COLLECTION)
-      .listDocuments()
-    const majorPromises = await Promise.all(
-      majorRefListPromise.map((el) => el.get())
-    )
-    const majors = majorPromises.map((el) => el.data())
+    const majors = await getMajors()
 
     const userPromise = await admin
       .firestore()

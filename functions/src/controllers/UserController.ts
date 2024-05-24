@@ -4,9 +4,13 @@ import { Response } from 'express'
 import * as admin from 'firebase-admin'
 import { USER_COLLECTION } from '..'
 
-export const getCurrentUser = async (request: Request, response: Response) => {
+const getUserUid = async (request: Request, response: Response) => {
   const token = await validateFirebaseIdToken(request, response)
-  const uid = token?.uid
+  return token?.uid
+}
+
+export const getCurrentUser = async (request: Request, response: Response) => {
+  const uid = await getUserUid(request, response)
   if (!uid) return
 
   try {
@@ -22,8 +26,7 @@ export const getCurrentUser = async (request: Request, response: Response) => {
 }
 
 export const createUser = async (request: Request, response: Response) => {
-  const token = await validateFirebaseIdToken(request, response)
-  const uid = token?.uid
+  const uid = await getUserUid(request, response)
   const data = request.body
   if (!uid) return
 
