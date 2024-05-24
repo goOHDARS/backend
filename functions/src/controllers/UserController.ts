@@ -1,48 +1,51 @@
-import { Request } from 'firebase-functions/v2/https'
-import validateFirebaseIdToken from '../middleware/validation'
+import { RequestWithUser } from '../middleware/validation'
 import { Response } from 'express'
-import * as admin from 'firebase-admin'
 import { USER_COLLECTION } from '..'
+import { getDoc, setDoc } from '../utils'
 
-const getUserUid = async (request: Request, response: Response) => {
-  const token = await validateFirebaseIdToken(request, response)
-  return token?.uid
+export type User = {
+  id: string
+  email: string
+  major: string
+  name: string
+  onboarded: boolean
+  pid: string
+  semester: number
+  year: number
 }
 
-export const getCurrentUser = async (request: Request, response: Response) => {
-  const uid = await getUserUid(request, response)
-  if (!uid) return
-
+export const getCurrentUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
   try {
-    const userPromise = await admin
-      .firestore()
-      .doc(`${USER_COLLECTION}/${uid}`)
-      .get()
-    const userData = userPromise.data()
-    response.status(200).send(userData)
+    const user = await getDoc<User>(`${USER_COLLECTION}/${request.userId}`)
+    response.status(200).send(user)
   } catch {
     response.status(404).send({ error: 'User Not Found' })
   }
 }
 
-export const createUser = async (request: Request, response: Response) => {
-  const uid = await getUserUid(request, response)
+export const createUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
   const data = request.body
-  if (!uid) return
-
-  const userInfo = {
+  const userInfo: User = {
+    id: request.userId,
     name: data.name,
     major: data.major,
     email: data.email,
     pid: data.pid,
     year: data.year,
+    semester: data.semester,
     onboarded: data.onboarded,
   }
 
   try {
-    await admin.firestore().doc(`${USER_COLLECTION}/${uid}`).set(userInfo)
+    await setDoc<User>(USER_COLLECTION, userInfo)
     response.status(200).send(userInfo)
-  } catch (err) {
-    response.status(500).send({ error: err })
+  } catch (err: any) {
+    response.status(500).send({ error: err.message })
   }
 }

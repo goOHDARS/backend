@@ -1,5 +1,26 @@
 import functions = require('firebase-functions/v1')
 import admin = require('firebase-admin')
+import { Request, Response } from 'express'
+
+export type RequestWithUser = Request & { userId: string }
+export type CallBack = (
+  request: RequestWithUser,
+  response: Response
+) => Promise<void>
+
+export const endpointWithAuth = (callback: CallBack) => {
+  return async (request: Request, response: Response) => {
+    const token = await validateFirebaseIdToken(request, response)
+
+    if (token?.uid) {
+      const reqWithUser: RequestWithUser = {
+        ...request,
+        userId: token.uid,
+      } as RequestWithUser
+      await callback(reqWithUser, response)
+    }
+  }
+}
 
 const validateFirebaseIdToken = async (req: any, res: any) => {
   functions.logger.log('Check if request is authorized with Firebase ID token')
@@ -47,5 +68,3 @@ const validateFirebaseIdToken = async (req: any, res: any) => {
     return
   }
 }
-
-export default validateFirebaseIdToken
