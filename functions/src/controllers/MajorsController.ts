@@ -8,12 +8,12 @@ const getMajors = async () => {
   const majorRefList = await admin
     .firestore()
     .collection(MAJOR_COLLECTION)
-    .listDocuments();
-  
+    .listDocuments()
+
   const majorDocs = await Promise.all(
-    majorRefList.map(docRef => docRef.get())
+    majorRefList.map((docRef) => docRef.get())
   )
-  return majorDocs.map(doc => doc.data()?.name)
+  return majorDocs.map((doc) => doc.data()?.name)
 }
 
 
