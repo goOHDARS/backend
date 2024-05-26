@@ -1,53 +1,53 @@
-import { Request } from 'firebase-functions/v2/https'
-import { Response } from 'express'
-import * as admin from 'firebase-admin'
+import { Request, Response } from 'express'
 import { MAJOR_COLLECTION, USER_COLLECTION } from '..'
-import validateFirebaseIdToken from '../middleware/validation'
+import { RequestWithUser } from '../middleware/validation'
+import { getCollection, getDoc } from '../utils'
+import { User } from './UserController'
 
-const getMajors = async () => {
-  const majorRefList = await admin
-    .firestore()
-    .collection(MAJOR_COLLECTION)
-    .listDocuments()
-
-  const majorDocs = await Promise.all(
-    majorRefList.map((docRef) => docRef.get())
-  )
-  return majorDocs.map((doc) => doc.data()?.name)
+export type Major = {
+  id: string
+  degree: string
+  name: string
+  planned_length: number
+  semester_divisions: number[]
 }
 
+export type MajorRequirements = {
+  id: string
+  category: string
+  subcategory: string
+  course: string
+  priority: number
+}
 
-export const getListOfMajors = async (request: Request, response: Response) => {
+export const getListOfMajors = async (_: Request, response: Response) => {
   try {
-    const majors = await getMajors()
-    response.status(200).send(majors)
-  } catch (err) {
-    response.status(500).send({ error: err })
+    const majors = await getCollection<Major>(MAJOR_COLLECTION)
+    const majorsList = majors.map((major) => major.name)
+    response.status(200).send(majorsList)
+  } catch (err: any) {
+    response.status(500).send({ error: err.message })
   }
 }
 
-export const getCurrentMajor = async (request: Request, response: Response) => {
-  const token = await validateFirebaseIdToken(request, response)
-  const uid = token?.uid
-  if (!uid) return
-
+export const getCurrentMajor = async (
+  request: RequestWithUser,
+  response: Response
+) => {
   try {
-    const majors = await getMajors()
-
-    const userPromise = await admin
-      .firestore()
-      .doc(`${USER_COLLECTION}/${uid}`)
-      .get()
-
-    const user = userPromise.data()
-    const userMajor = majors.find((el) => el?.name == user?.major)
+    const user = await getDoc<User>(`${USER_COLLECTION}/${request.userId}`)
+    const majors = await getCollection<Major>(MAJOR_COLLECTION)
+    const userMajor = majors.find((major) => {
+      console.log(`${user.major}, ${major.name}`)
+      return major.name === user.major
+    })
 
     if (userMajor) {
       response.status(200).send(userMajor)
     } else {
       response.status(404).send({ error: 'Major Not Found' })
     }
-  } catch (err) {
-    response.status(500).send({ error: err })
+  } catch (err: any) {
+    response.status(500).send({ error: err.message })
   }
 }
