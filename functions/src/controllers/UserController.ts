@@ -15,6 +15,11 @@ export type User = {
   photoURL: string
 }
 
+export const getUser = async (uid: string) => {
+  const user = await getDoc<User>(`${USER_COLLECTION}/${uid}`)
+  return user
+}
+
 export const getCurrentUser = async (
   request: RequestWithUser,
   response: Response
