@@ -14,12 +14,17 @@ export type User = {
   year: number
 }
 
+export const getUser = async (uid: string) => {
+  const user = await getDoc<User>(`${USER_COLLECTION}/${uid}`)
+  return user
+}
+
 export const getCurrentUser = async (
   request: RequestWithUser,
   response: Response
 ) => {
   try {
-    const user = await getDoc<User>(`${USER_COLLECTION}/${request.userId}`)
+    const user = await getUser(request.userId)
     response.status(200).send(user)
   } catch {
     response.status(404).send({ error: 'User Not Found' })
@@ -30,19 +35,19 @@ export const createUser = async (
   request: RequestWithUser,
   response: Response
 ) => {
-  const data = request.body
-  const userInfo: User = {
-    id: request.userId,
-    name: data.name,
-    major: data.major,
-    email: data.email,
-    pid: data.pid,
-    year: data.year,
-    semester: data.semester,
-    onboarded: data.onboarded,
-  }
-
   try {
+    const data = request.body
+    const userInfo: User = {
+      id: request.userId,
+      name: data.name,
+      major: data.major,
+      email: data.email,
+      pid: data.pid,
+      year: data.year,
+      semester: data.semester,
+      onboarded: data.onboarded,
+    }
+
     await setDoc<User>(USER_COLLECTION, userInfo)
     response.status(200).send(userInfo)
   } catch (err: any) {
