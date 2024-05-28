@@ -12,11 +12,7 @@ export type User = {
   pid: string
   semester: number
   year: number
-}
-
-export const getUser = async (uid: string) => {
-  const user = await getDoc<User>(`${USER_COLLECTION}/${uid}`)
-  return user
+  photoURL: string
 }
 
 export const getCurrentUser = async (
@@ -37,6 +33,14 @@ export const createUser = async (
 ) => {
   try {
     const data = request.body
+    let pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${Math.floor(Math.random() * 1025) + 1}`)
+    const pokemon = await pokemonResponse.json()
+
+    if (!pokemon){
+      console.log("Poke API fetch not OK")
+      return
+    }
+
     const userInfo: User = {
       id: request.userId,
       name: data.name,
@@ -46,7 +50,10 @@ export const createUser = async (
       year: data.year,
       semester: data.semester,
       onboarded: data.onboarded,
-    }
+      photoURL: pokemon?.sprites.front_default
+      ? pokemon.sprites.front_default
+      : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
+      }
 
     await setDoc<User>(USER_COLLECTION, userInfo)
     response.status(200).send(userInfo)
