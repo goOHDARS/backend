@@ -38,11 +38,18 @@ export const createUser = async (
 ) => {
   try {
     const data = request.body
-    let pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${Math.floor(Math.random() * 1025) + 1}`)
+
+    console.log("creating user")
+    const pokemonResponse = await fetch(
+      `https://pokeapi.co/api/v2/pokemon/${Math.floor(Math.random() * 1025) + 1}`,
+    )
     const pokemon = await pokemonResponse.json()
 
+    console.log("pokemon: ")
+    console.log(pokemon)
+
     if (!pokemon){
-      console.log("Poke API fetch not OK")
+      response.status(403).send({ error: 'Poke API fetch not OK' })
       return
     }
 
@@ -58,7 +65,7 @@ export const createUser = async (
       photoURL: pokemon?.sprites.front_default
       ? pokemon.sprites.front_default
       : 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
-      }
+    }
 
     await setDoc<User>(USER_COLLECTION, userInfo)
     response.status(200).send(userInfo)
