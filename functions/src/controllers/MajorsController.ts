@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
-import { MAJOR_COLLECTION, USER_COLLECTION } from '..'
+import { MAJOR_COLLECTION } from '..'
 import { RequestWithUser } from '../middleware/validation'
 import { getCollection, getDoc } from '../utils'
-import { User } from './UserController'
+import { getUser } from './UserController'
 
 export type Major = {
   id: string
@@ -18,6 +18,12 @@ export type MajorRequirements = {
   subcategory: string
   course: string
   priority: number
+  semester: number
+}
+
+export const getMajor = async (name: string) => {
+  const major = await getDoc<Major>(MAJOR_COLLECTION, [['name', '==', name]])
+  return major
 }
 
 export const getListOfMajors = async (_: Request, response: Response) => {
@@ -35,18 +41,10 @@ export const getCurrentMajor = async (
   response: Response
 ) => {
   try {
-    const user = await getDoc<User>(`${USER_COLLECTION}/${request.userId}`)
-    const majors = await getCollection<Major>(MAJOR_COLLECTION)
-    const userMajor = majors.find((major) => {
-      console.log(`${user.major}, ${major.name}`)
-      return major.name === user.major
-    })
+    const user = await getUser(request.userId)
+    const major = await getMajor(user.major)
 
-    if (userMajor) {
-      response.status(200).send(userMajor)
-    } else {
-      response.status(404).send({ error: 'Major Not Found' })
-    }
+    response.status(200).send(major)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
   }
