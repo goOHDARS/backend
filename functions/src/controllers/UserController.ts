@@ -39,17 +39,12 @@ export const createUser = async (
   try {
     const data = request.body
 
-    console.log('creating user')
     const pokemonResponse = await fetch(
       `https://pokeapi.co/api/v2/pokemon/${Math.floor(Math.random() * 1025) + 1}`,
     )
     const pokemon = await pokemonResponse.json()
 
-    console.log('pokemon: ')
-    console.log(pokemon)
-
     if (!pokemon) {
-      console.log('pokemon not found')
       response.status(500).send({ error: 'Poke API not OK' })
       return
     }
