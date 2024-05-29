@@ -2,6 +2,7 @@
   "name": "functions",
   "scripts": {
     "lint": "eslint --ext .js,.ts .",
+    "lint-fix": "eslint --fix .",
     "build": "tsc",
     "serve": "firebase serve --only functions",
     "shell": "firebase functions:shell",
