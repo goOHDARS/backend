@@ -12,11 +12,11 @@ export type Major = {
   semester_divisions: number[]
 }
 
-export type MajorRequirements = {
+export type MajorRequirement = {
   id: string
   category: string
   subcategory: string
-  course: string
+  course: string[]
   priority: number
   semester: number
 }
