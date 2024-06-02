@@ -52,7 +52,8 @@ export const queryCourses = async (
     )
 
     const filteredRequirements = filteredCourses.map((course) => {
-      // @TODO: this only finds the first requirement that fits, it is possible to count as multiple requirements
+      // @TODO: this only finds the first requirement that fits,
+      // it is possible to count as multiple requirements
       const requirement = allRequirements.find((el) =>
         el.course.includes(course.shortName)
       )
@@ -100,7 +101,8 @@ export const getInitialCourses = async (
       filters
     )
 
-    //@TODO: except array of courses as valid so that we can add requirements that could have multiple courses
+    // @TODO: except array of courses as valid so that we can add
+    // requirements that could have multiple courses
     const courses = await Promise.all(
       requiredCourses.map((el) =>
         getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', el.course[0]]])
