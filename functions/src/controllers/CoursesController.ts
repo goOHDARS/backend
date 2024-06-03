@@ -1,7 +1,7 @@
 import { RequestWithUser } from '../middleware/validation'
 import { Response } from 'express'
 import { User, getUser } from './UserController'
-import { MajorRequirements, getMajor } from './MajorsController'
+import { MajorRequirement, getMajor } from './MajorsController'
 import { deleteDoc, filter, getCollection, getDoc, setDoc } from '../utils'
 import { COURSE_COLLECTION, MAJOR_COLLECTION, USER_COLLECTION } from '..'
 
@@ -10,8 +10,8 @@ type CourseBrief = {
   fullName: string
   shortName: string
   credits: number
-  semester: number
-  category: string
+  semester: number | null
+  category?: string
   subcategory?: string
 }
 
@@ -34,6 +34,54 @@ export type UserCourse = {
   subcategory?: string
 }
 
+export const queryCourses = async (
+  request: RequestWithUser,
+  response: Response
+) => {
+  try {
+    const user = await getUser(request.userId)
+    const major = await getMajor(user.major)
+    const allCourses = await getCollection<Course>(COURSE_COLLECTION)
+    const allRequirements = await getCollection<MajorRequirement>(
+      `${MAJOR_COLLECTION}/${major.id}/requirements`
+    )
+
+    const partialCourseName: string = request.body.search
+    const filteredCourses = allCourses.filter((course) =>
+      course.shortName.includes(partialCourseName.toUpperCase())
+    )
+
+    const filteredRequirements = filteredCourses.map((course) => {
+      // @TODO: this only finds the first requirement that fits,
+      // it is possible to count as multiple requirements
+      const requirement = allRequirements.find((el) =>
+        el.course.includes(course.shortName)
+      )
+      return requirement
+    })
+
+    const coursesAndRequirements: CourseBrief[] = []
+    for (let i = 0; i < filteredCourses.length; i++) {
+      const requirement = filteredRequirements[i]
+      const course = filteredCourses[i]
+
+      coursesAndRequirements.push({
+        id: course.id,
+        fullName: course.fullName,
+        shortName: course.shortName,
+        credits: course.credits,
+        semester: null,
+        category: requirement?.category,
+        subcategory: requirement?.subcategory,
+      })
+    }
+
+    response.status(200).send(coursesAndRequirements)
+  } catch (err: any) {
+    response.status(500).send({ error: err })
+  }
+}
+
 export const getInitialCourses = async (
   request: RequestWithUser,
   response: Response
@@ -48,14 +96,16 @@ export const getInitialCourses = async (
       filters.push(['priority', '<', major.semester_divisions[user.semester]])
     }
 
-    const requiredCourses = await getCollection<MajorRequirements>(
+    const requiredCourses = await getCollection<MajorRequirement>(
       `${MAJOR_COLLECTION}/${major.id}/requirements`,
       filters
     )
 
+    // @TODO: except array of courses as valid so that we can add
+    // requirements that could have multiple courses
     const courses = await Promise.all(
       requiredCourses.map((el) =>
-        getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', el.course]])
+        getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', el.course[0]]])
       )
     )
 

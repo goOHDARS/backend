@@ -12,6 +12,7 @@ import {
   getCourseInfo,
   getCourses,
   getInitialCourses,
+  queryCourses,
   removeUserCourse,
   setInitialCourses,
 } from './controllers/CoursesController'
@@ -33,6 +34,7 @@ app.get('/get_current_major', endpointWithAuth(getCurrentMajor))
 app.get('/get_initial_courses', endpointWithAuth(getInitialCourses))
 app.post('/set_initial_courses', endpointWithAuth(setInitialCourses))
 app.get('/get_courses', endpointWithAuth(getCourses))
+app.post('/query_courses', endpointWithAuth(queryCourses))
 
 app.post('/add_user_course', endpointWithAuth(addUserCourse))
 app.delete('/remove_user_course', endpointWithAuth(removeUserCourse))
