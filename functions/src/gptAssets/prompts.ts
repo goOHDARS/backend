@@ -2,7 +2,7 @@ import { ChatCompletionMessageParam } from 'openai/resources'
 import { User } from '../controllers/UserController'
 
 export const getInitialPrompts = (user: User) => {
-  return initialPrompts.concat(userDataPrompt(user))
+  return [userDataPrompt(user)].concat(initialPrompts)
 }
 
 const initialPrompts: ChatCompletionMessageParam[] = [

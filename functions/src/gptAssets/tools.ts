@@ -124,14 +124,14 @@ export const generateMessageFromToolCall = async (
           '\n\nPlease let me know if you need anything else.'
         )
       } catch {
-        return `Hmm... I was not able to find ${name}. Make sure there are no spaces between the college and number.`
+        return `Hmm... I was not able to find ${name}. Make sure you are using its short name. ex: CS2400.`
       }
     },
     addUserCourse: async ({ name, semester }) => {
       const results = await queryCoursesTool(userId, name ?? '')
 
       if (results.length === 0) {
-        return `Hmm... I was not able to find ${name}. Make sure there are no spaces between the college and number.`
+        return `Hmm... I was not able to find ${name}. Make sure you are using its short name. ex: CS2400.`
       }
 
       const search = results[0]
