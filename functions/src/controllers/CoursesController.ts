@@ -30,8 +30,131 @@ export type UserCourse = {
   id: string
   course: string
   semester: number
-  category: string
+  category?: string
   subcategory?: string
+}
+
+export const getCoursesTool = async (userID: string) => {
+  const userCourses = await getCollection<UserCourse>(
+    `${USER_COLLECTION}/${userID}/courses`
+  )
+
+  const courses = await Promise.all(
+    userCourses.map((course) =>
+      getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', course.course]])
+    )
+  )
+
+  const courseBriefs: CourseBrief[] = []
+  for (let i = 0; i < userCourses.length; i++) {
+    const userCourse = userCourses[i]
+    const course = courses[i]
+
+    courseBriefs.push({
+      id: course.id,
+      fullName: course.fullName,
+      shortName: course.shortName,
+      credits: course.credits,
+      semester: userCourse.semester,
+      category: userCourse.category,
+      subcategory: userCourse.subcategory,
+    })
+  }
+
+  return courseBriefs
+}
+
+export const getCourseInfoTool = async (name: string) => {
+  const course = await getDoc<Course>(COURSE_COLLECTION, [
+    ['shortName', '==', name.replace(' ', '')],
+  ])
+
+  return course
+}
+
+export const addUserCourseTool = async (
+  userID: string,
+  courseInfo: Omit<UserCourse, 'id'>
+) => {
+  const currentCourses = await getCollection<UserCourse>(
+    `${USER_COLLECTION}/${userID}/courses`,
+    [['course', '==', courseInfo.course]]
+  )
+
+  if (currentCourses.length > 0) {
+    throw Error('Course is Already Added')
+  }
+
+  const course = await getDoc<Course>(COURSE_COLLECTION, [
+    ['shortName', '==', courseInfo.course],
+  ])
+
+  await setDoc<Omit<UserCourse, 'id'>>(
+    `${USER_COLLECTION}/${userID}/courses`,
+    courseInfo
+  )
+
+  const brief: CourseBrief = {
+    id: course.id,
+    fullName: course.fullName,
+    shortName: course.shortName,
+    credits: course.credits,
+    semester: courseInfo.semester,
+    category: courseInfo.category,
+    subcategory: courseInfo.subcategory,
+  }
+
+  return brief
+}
+
+export const removeUserCourseTool = async (userID: string, name: string) => {
+  const { id, course } = await getDoc<UserCourse>(
+    `${USER_COLLECTION}/${userID}/courses`,
+    [['course', '==', name.replace(' ', '')]]
+  )
+
+  await deleteDoc(`${USER_COLLECTION}/${userID}/courses/${id}`)
+  return course
+}
+
+export const queryCoursesTool = async (userID: string, search: string) => {
+  const user = await getUser(userID)
+  const major = await getMajor(user.major)
+  const allCourses = await getCollection<Course>(COURSE_COLLECTION)
+  const allRequirements = await getCollection<MajorRequirement>(
+    `${MAJOR_COLLECTION}/${major.id}/requirements`
+  )
+
+  const filteredCourses = allCourses.filter((course) =>
+    course.shortName.includes(search.toUpperCase().replace(' ', ''))
+  )
+
+  const filteredRequirements = filteredCourses.map((course) => {
+    // @TODO: this only finds the first requirement that fits,
+    // it is possible to count as multiple requirements
+    const requirement = allRequirements.find((el) =>
+      el.course.includes(course.shortName)
+    )
+    return requirement
+  })
+
+  const coursesAndRequirements: CourseBrief[] = []
+  for (let i = 0; i < filteredCourses.length; i++) {
+    const requirement = filteredRequirements[i]
+    const course = filteredCourses[i]
+
+    coursesAndRequirements.push({
+      id: course.id,
+      fullName: course.fullName,
+      shortName: course.shortName,
+      credits: course.credits,
+      semester: null,
+      category: requirement?.category,
+      subcategory: requirement?.subcategory,
+    })
+  }
+
+  return coursesAndRequirements
 }
 
 export const queryCourses = async (
@@ -39,43 +162,11 @@ export const queryCourses = async (
   response: Response
 ) => {
   try {
-    const user = await getUser(request.userId)
-    const major = await getMajor(user.major)
-    const allCourses = await getCollection<Course>(COURSE_COLLECTION)
-    const allRequirements = await getCollection<MajorRequirement>(
-      `${MAJOR_COLLECTION}/${major.id}/requirements`
-    )
-
     const partialCourseName: string = request.body.search
-    const filteredCourses = allCourses.filter((course) =>
-      course.shortName.includes(partialCourseName.toUpperCase())
+    const coursesAndRequirements = await queryCoursesTool(
+      request.userId,
+      partialCourseName
     )
-
-    const filteredRequirements = filteredCourses.map((course) => {
-      // @TODO: this only finds the first requirement that fits,
-      // it is possible to count as multiple requirements
-      const requirement = allRequirements.find((el) =>
-        el.course.includes(course.shortName)
-      )
-      return requirement
-    })
-
-    const coursesAndRequirements: CourseBrief[] = []
-    for (let i = 0; i < filteredCourses.length; i++) {
-      const requirement = filteredRequirements[i]
-      const course = filteredCourses[i]
-
-      coursesAndRequirements.push({
-        id: course.id,
-        fullName: course.fullName,
-        shortName: course.shortName,
-        credits: course.credits,
-        semester: null,
-        category: requirement?.category,
-        subcategory: requirement?.subcategory,
-      })
-    }
-
     response.status(200).send(coursesAndRequirements)
   } catch (err: any) {
     response.status(500).send({ error: err })
@@ -158,26 +249,7 @@ export const addUserCourse = async (
 ) => {
   try {
     const courseInfo: Omit<UserCourse, 'id'> = request.body.course
-
-    await setDoc<Omit<UserCourse, 'id'>>(
-      `${USER_COLLECTION}/${request.userId}/courses`,
-      courseInfo
-    )
-
-    const course = await getDoc<Course>(COURSE_COLLECTION, [
-      ['shortName', '==', courseInfo.course],
-    ])
-
-    const brief: CourseBrief = {
-      id: course.id,
-      fullName: course.fullName,
-      shortName: course.shortName,
-      credits: course.credits,
-      semester: courseInfo.semester,
-      category: courseInfo.category,
-      subcategory: courseInfo.subcategory,
-    }
-
+    const brief = await addUserCourseTool(request.userId, courseInfo)
     response.status(200).send(brief)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
@@ -190,13 +262,7 @@ export const removeUserCourse = async (
 ) => {
   try {
     const courseName: string = request.body.course
-    const { id, course } = await getDoc<UserCourse>(
-      `${USER_COLLECTION}/${request.userId}/courses`,
-      [['course', '==', courseName]]
-    )
-
-    await deleteDoc(`${USER_COLLECTION}/${request.userId}/courses/${id}`)
-
+    const course = await removeUserCourseTool(request.userId, courseName)
     response.status(200).send({ courseName: course })
   } catch (err: any) {
     response.status(500).send({ error: err.message })
@@ -209,11 +275,7 @@ export const getCourseInfo = async (
 ) => {
   try {
     const courseName: string = request.body.course
-
-    const course = await getDoc<Course>(COURSE_COLLECTION, [
-      ['shortName', '==', courseName],
-    ])
-
+    const course = await getCourseInfoTool(courseName)
     response.status(200).send(course)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
@@ -225,32 +287,7 @@ export const getCourses = async (
   response: Response
 ) => {
   try {
-    const userCourses = await getCollection<UserCourse>(
-      `${USER_COLLECTION}/${request.userId}/courses`
-    )
-
-    const courses = await Promise.all(
-      userCourses.map((course) =>
-        getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', course.course]])
-      )
-    )
-
-    const courseBriefs: CourseBrief[] = []
-    for (let i = 0; i < userCourses.length; i++) {
-      const userCourse = userCourses[i]
-      const course = courses[i]
-
-      courseBriefs.push({
-        id: course.id,
-        fullName: course.fullName,
-        shortName: course.shortName,
-        credits: course.credits,
-        semester: userCourse.semester,
-        category: userCourse.category,
-        subcategory: userCourse.subcategory,
-      })
-    }
-
+    const courseBriefs = await getCoursesTool(request.userId)
     response.status(200).send(courseBriefs)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
