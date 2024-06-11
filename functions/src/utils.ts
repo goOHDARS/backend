@@ -34,13 +34,19 @@ export async function setDoc<DocType extends WithFieldValue<DocumentData>>(
   collectionPath: string,
   data: DocType
 ) {
-  if (data.id) {
-    const id = data.id
-    delete data.id
-    await admin.firestore().doc(`${collectionPath}/${id}`).set(data)
+  const copyData = { ...data }
+  if (copyData.id) {
+    const id = copyData.id
+    delete copyData.id
+    await admin.firestore().doc(`${collectionPath}/${id}`).set(copyData)
+    return copyData.id as string
   } else {
-    delete data.id
-    await admin.firestore().collection(collectionPath).add(data)
+    delete copyData.id
+    const newData = await admin
+      .firestore()
+      .collection(collectionPath)
+      .add(copyData)
+    return newData.id
   }
 }
 
