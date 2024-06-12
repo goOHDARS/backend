@@ -25,9 +25,11 @@ jobs:
         run: npm install
         working-directory: functions
 
+      - name: Create .env file
+        run: echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > functions/.env
+
       - name: Deploy to Firebase
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: firebase deploy --only functions
         working-directory: functions
