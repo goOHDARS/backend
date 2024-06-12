@@ -26,7 +26,8 @@ jobs:
         working-directory: functions
 
       - name: Create .env file
-        run: echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > functions/.env
+        run: |
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> functions/.env
 
       - name: Deploy to Firebase
         env:
