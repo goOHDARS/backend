@@ -1,6 +1,6 @@
 import { RequestWithUser } from '../middleware/validation'
 import { Response } from 'express'
-import { User, getUser } from './UserController'
+import { User, getCurrentSemester, getUser } from './UserController'
 import { MajorRequirement, getMajor } from './MajorsController'
 import { deleteDoc, filter, getCollection, getDoc, setDoc } from '../utils'
 import { COURSE_COLLECTION, MAJOR_COLLECTION, USER_COLLECTION } from '..'
@@ -179,12 +179,13 @@ export const getInitialCourses = async (
 ) => {
   try {
     const user = await getUser(request.userId)
+    const semester = getCurrentSemester(user.dateJoined, user.startingSemester)
     const major = await getMajor(user.major)
 
     const filters: filter[] = []
 
-    if (user.semester < major.planned_length) {
-      filters.push(['priority', '<', major.semester_divisions[user.semester]])
+    if (semester < major.planned_length) {
+      filters.push(['priority', '<', major.semester_divisions[semester]])
     }
 
     const requiredCourses = await getCollection<MajorRequirement>(

@@ -1,5 +1,5 @@
 import { ChatCompletionMessageParam } from 'openai/resources'
-import { User } from '../controllers/UserController'
+import { User, getCurrentSemester } from '../controllers/UserController'
 
 export const getInitialPrompts = (user: User) => {
   return [userDataPrompt(user)].concat(initialPrompts)
@@ -29,5 +29,8 @@ const userDataPrompt = (user: User) =>
     role: 'system',
     content:
       'Use this user infomation if needed. ' +
-      `Name: ${user.name}, Major: ${user.major}, Semester: ${user.semester}, PID: ${user.pid}`,
+      `Name: ${user.name}, Major: ${user.major}, Semester: ${getCurrentSemester(
+        user.dateJoined,
+        user.startingSemester
+      )}, PID: ${user.pid}`,
   } as ChatCompletionMessageParam)
