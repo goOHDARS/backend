@@ -1,7 +1,7 @@
 import { onRequest } from 'firebase-functions/v2/https'
 import * as admin from 'firebase-admin'
 import * as express from 'express'
-import { createUser, getCurrentUser } from './controllers/UserController'
+import { createUser, deleteUser, getCurrentUser, updateUser } from './controllers/UserController'
 import {
   getCurrentMajor,
   getListOfMajors,
@@ -32,6 +32,8 @@ admin.firestore().settings({ ignoreUndefinedProperties: true })
 app.use(express.json())
 
 app.get('/get_current_user', endpointWithAuth(getCurrentUser))
+app.delete('delete_user', endpointWithAuth(deleteUser))
+app.patch('/update_user', endpointWithAuth(updateUser))
 app.post('/create_user', endpointWithAuth(createUser))
 
 app.get('/get_majors', getListOfMajors)

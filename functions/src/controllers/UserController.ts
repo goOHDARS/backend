@@ -1,7 +1,7 @@
 import { RequestWithUser } from '../middleware/validation'
 import { Response } from 'express'
 import { USER_COLLECTION } from '..'
-import { getDoc, setDoc } from '../utils'
+import { deleteDoc, getDoc, setDoc } from '../utils'
 import dayjs = require('dayjs')
 
 export type User = {
@@ -74,6 +74,35 @@ export const getCurrentUser = async (
   }
 }
 
+export const updateUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
+  try {
+    // const user = await getUser(request.userId)
+
+    const data = request.body
+
+    const userInfo: User = {
+      id: request.userId,
+      name: data.name,
+      major: data.major,
+      email: data.email,
+      pid: data.pid,
+      startingSemester: data.startingSemester,
+      dateJoined: data.dateJoined,
+      onboarded: data.onboarded,
+      photoURL: data.photoURL,
+    }
+
+    await setDoc<User>(USER_COLLECTION, userInfo)
+
+    response.status(200).send(userInfo)
+  } catch (error: any) {
+    response.status(500).send({ error: error.message})
+  }
+}
+
 export const createUser = async (
   request: RequestWithUser,
   response: Response
@@ -121,5 +150,17 @@ export const createUser = async (
     response.status(200).send(userWithYearAndSemester)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
+  }
+}
+
+export const deleteUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
+  try {
+    await deleteDoc(`${USER_COLLECTION}/${request.userId}`)
+    response.status(200).send({ message: 'User deleted' })
+  } catch (error: any) {
+    response.status(500).send({ error: error.message })
   }
 }

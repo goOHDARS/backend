@@ -236,7 +236,6 @@ export const setInitialCourses = async (
         setDoc<typeof el>(`${USER_COLLECTION}/${request.userId}/courses`, el)
       )
     )
-
     await setDoc<User>(USER_COLLECTION, { ...user, onboarded: true })
     response.status(200).send({ status: 'success' })
   } catch (err: any) {
