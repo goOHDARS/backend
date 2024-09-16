@@ -32,7 +32,7 @@ admin.firestore().settings({ ignoreUndefinedProperties: true })
 app.use(express.json())
 
 app.get('/get_current_user', endpointWithAuth(getCurrentUser))
-app.delete('delete_user', endpointWithAuth(deleteUser))
+app.delete('/delete_user', endpointWithAuth(deleteUser))
 app.patch('/update_user', endpointWithAuth(updateUser))
 app.post('/create_user', endpointWithAuth(createUser))
 

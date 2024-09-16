@@ -14,6 +14,7 @@ export type User = {
   startingSemester: number
   dateJoined: string
   photoURL: string
+  borderURLColor: string
 }
 
 export const getUser = async (uid: string) => {
@@ -79,25 +80,32 @@ export const updateUser = async (
   response: Response
 ) => {
   try {
-    // const user = await getUser(request.userId)
+    const user = await getUser(request.userId)
 
     const data = request.body
 
-    const userInfo: User = {
+    const userInfo : User = {
       id: request.userId,
       name: data.name,
       major: data.major,
       email: data.email,
+      startingSemester: user.startingSemester,
+      dateJoined: user.dateJoined,
       pid: data.pid,
-      startingSemester: data.startingSemester,
-      dateJoined: data.dateJoined,
       onboarded: data.onboarded,
       photoURL: data.photoURL,
+      borderURLColor: data.borderURLColor,
     }
 
     await setDoc<User>(USER_COLLECTION, userInfo)
 
-    response.status(200).send(userInfo)
+    response.status(200).send({
+      ...userInfo,
+      startingSemester: undefined,
+      dateJoined: undefined,
+      semester: getCurrentSemester(userInfo.dateJoined, userInfo.startingSemester),
+      year: getCurrentYear(userInfo.dateJoined, userInfo.startingSemester),
+    })
   } catch (error: any) {
     response.status(500).send({ error: error.message})
   }
@@ -134,6 +142,7 @@ export const createUser = async (
       photoURL:
         pokemon?.sprites.front_default ??
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
+      borderURLColor: 'black',
     }
     await setDoc<User>(USER_COLLECTION, userInfo)
 
