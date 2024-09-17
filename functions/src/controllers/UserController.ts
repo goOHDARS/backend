@@ -1,7 +1,7 @@
 import { RequestWithUser } from '../middleware/validation'
 import { Response } from 'express'
 import { USER_COLLECTION } from '..'
-import { getDoc, setDoc } from '../utils'
+import { deleteDoc, getDoc, setDoc } from '../utils'
 import dayjs = require('dayjs')
 
 export type User = {
@@ -14,6 +14,7 @@ export type User = {
   startingSemester: number
   dateJoined: string
   photoURL: string
+  borderURLColor: string
 }
 
 export const getUser = async (uid: string) => {
@@ -74,6 +75,42 @@ export const getCurrentUser = async (
   }
 }
 
+export const updateUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
+  try {
+    const user = await getUser(request.userId)
+
+    const data = request.body
+
+    const userInfo : User = {
+      id: request.userId,
+      name: data.name,
+      major: data.major,
+      email: data.email,
+      startingSemester: user.startingSemester,
+      dateJoined: user.dateJoined,
+      pid: data.pid,
+      onboarded: data.onboarded,
+      photoURL: data.photoURL,
+      borderURLColor: data.borderURLColor,
+    }
+
+    await setDoc<User>(USER_COLLECTION, userInfo)
+
+    response.status(200).send({
+      ...userInfo,
+      startingSemester: undefined,
+      dateJoined: undefined,
+      semester: getCurrentSemester(userInfo.dateJoined, userInfo.startingSemester),
+      year: getCurrentYear(userInfo.dateJoined, userInfo.startingSemester),
+    })
+  } catch (error: any) {
+    response.status(500).send({ error: error.message})
+  }
+}
+
 export const createUser = async (
   request: RequestWithUser,
   response: Response
@@ -105,6 +142,7 @@ export const createUser = async (
       photoURL:
         pokemon?.sprites.front_default ??
         'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png',
+      borderURLColor: 'black',
     }
     await setDoc<User>(USER_COLLECTION, userInfo)
 
@@ -121,5 +159,17 @@ export const createUser = async (
     response.status(200).send(userWithYearAndSemester)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
+  }
+}
+
+export const deleteUser = async (
+  request: RequestWithUser,
+  response: Response
+) => {
+  try {
+    await deleteDoc(`${USER_COLLECTION}/${request.userId}`)
+    response.status(200).send({ message: 'User deleted' })
+  } catch (error: any) {
+    response.status(500).send({ error: error.message })
   }
 }
