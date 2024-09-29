@@ -101,7 +101,10 @@ export const generateMessageFromToolCall = async (
     (params: AllParams) => Promise<string>
   > = {
     getCourses: async () => {
-      const briefs = await getCoursesTool(userId)
+      const briefs = (await getCoursesTool(userId)).filter(
+        // filter out suggestions
+        (el) => !el.suggestion
+      )
       return (
         'Below are the courses you are currently enrolled in.\n\n' +
         briefs.map((el) => el.shortName).join('\n') +

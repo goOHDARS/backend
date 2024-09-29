@@ -11,6 +11,7 @@ type CourseBrief = {
   shortName: string
   credits: number
   semester: number | null
+  suggestion?: boolean
   category?: string
   subcategory?: string
 }
@@ -34,31 +35,81 @@ export type UserCourse = {
   subcategory?: string
 }
 
+const pickRandomCourse = (
+  userCourses: UserCourse[],
+  possibleCourses: string[]
+) => {
+  const filteredChoices = possibleCourses.filter(
+    (course) => !userCourses.find((el) => el.course === course)
+  )
+
+  return filteredChoices[Math.floor(Math.random() * filteredChoices.length)]
+}
+
 export const getCoursesTool = async (userID: string) => {
+  const user = await getUser(userID)
+  const userMajor = await getMajor(user.major)
   const userCourses = await getCollection<UserCourse>(
     `${USER_COLLECTION}/${userID}/courses`
   )
 
+  // Begin find course suggestions
+  const nextSemester = Math.min(
+    userMajor.planned_length - 1,
+    getCurrentSemester(user.dateJoined, user.startingSemester) + 1
+  )
+
+  const requirements = await getCollection<MajorRequirement>(
+    `${MAJOR_COLLECTION}/${userMajor.id}/requirements`,
+    [['priority', '<', userMajor.semester_divisions[nextSemester]]]
+  )
+
+  const remainingReqs: UserCourse[] = requirements
+    .filter(
+      (req) => !userCourses.find((course) => req.course.includes(course.course))
+    )
+    .sort((a, b) => a.priority - b.priority)
+    .map((req) => ({
+      id: '0',
+      course: pickRandomCourse(userCourses, req.course),
+      semester: nextSemester,
+      category: req.category,
+      subcategory: req.subcategory,
+    }))
+
+  const userCoursesAndSuggestions = [...userCourses, ...remainingReqs]
   const courses = await Promise.all(
-    userCourses.map((course) =>
+    userCoursesAndSuggestions.map((course) =>
       getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', course.course]])
     )
   )
 
   const courseBriefs: CourseBrief[] = []
-  for (let i = 0; i < userCourses.length; i++) {
-    const userCourse = userCourses[i]
+  let totalSemCredits = 0
+  for (let i = 0; i < userCoursesAndSuggestions.length; i++) {
+    const userCourse = userCoursesAndSuggestions[i]
     const course = courses[i]
 
-    courseBriefs.push({
+    const brief: CourseBrief = {
       id: course.id,
       fullName: course.fullName,
       shortName: course.shortName,
       credits: course.credits,
       semester: userCourse.semester,
+      suggestion: userCourse.id === '0' || undefined,
       category: userCourse.category,
       subcategory: userCourse.subcategory,
-    })
+    }
+
+    if (!brief.suggestion) {
+      courseBriefs.push(brief)
+      if (brief.semester === nextSemester) totalSemCredits += brief.credits
+    } else {
+      totalSemCredits += brief.credits
+      if (totalSemCredits <= 16) {
+        courseBriefs.push(brief)
+      }
+    }
   }
 
   return courseBriefs
