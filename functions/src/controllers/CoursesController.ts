@@ -41,13 +41,21 @@ const MAX_SEMESTER_SIZE = 16
 
 const pickRandomCourse = (
   userCourses: UserCourse[],
-  possibleCourses: string[]
+  possibleCourses: { name: string; prereq: string[] }[]
 ) => {
+  // filter possible course depending on whether it was
+  // not taken and if its prereqs were taken
   const filteredChoices = possibleCourses.filter(
-    (course) => !userCourses.find((el) => el.course === course)
+    (course) =>
+      !userCourses.find((el) => el.course === course.name) &&
+      course.prereq.filter((pr) => !userCourses.find((el) => el.course === pr))
+        .length === 0
   )
 
+  if (filteredChoices.length === 0) return undefined
+
   return filteredChoices[Math.floor(Math.random() * filteredChoices.length)]
+    .name
 }
 
 export const getCoursesTool = async (userID: string) => {
@@ -63,28 +71,50 @@ export const getCoursesTool = async (userID: string) => {
     getCurrentSemester(user.dateJoined, user.startingSemester) + 1
   )
 
-  // get all reqs up to next semester
+  // get all reqs
   const requirements = await getCollection<MajorRequirement>(
-    `${MAJOR_COLLECTION}/${userMajor.id}/requirements`,
-    [['priority', '<', userMajor.semester_divisions[nextSemester]]]
+    `${MAJOR_COLLECTION}/${userMajor.id}/requirements`
   )
 
   // filter reqs to only ones that have not been met
-  const remainingReqs: UserCourse[] = requirements
-    .filter(
-      (req) => !userCourses.find((course) => course.priority === req.priority)
+  const remainingReqs = (
+    await Promise.all(
+      requirements
+        .filter(
+          (req) =>
+            !userCourses.find((course) => course.priority === req.priority)
+        )
+        .sort((a, b) => a.priority - b.priority)
+        // fill reqs with prereqs for each possible course
+        .map(async (req) => ({
+          ...req,
+          course: await Promise.all(
+            req.course.map(async (course) => ({
+              name: course,
+              prereq: (
+                await getDoc<Course>(COURSE_COLLECTION, [
+                  ['shortName', '==', course],
+                ])
+              ).prereq,
+            }))
+          ),
+        }))
     )
-    .sort((a, b) => a.priority - b.priority)
+  )
     .map((req) => ({
       id: '0',
+      // pick random course that has its prereqs met
       course: pickRandomCourse(userCourses, req.course),
       semester: nextSemester,
       category: req.category,
       subcategory: req.subcategory,
       priority: req.priority,
     }))
+    .filter((el) => el.course) as UserCourse[]
 
+  // concat suggestions to end of user courses
   const userCoursesAndSuggestions = [...userCourses, ...remainingReqs]
+  // find the rest of the course information for each course
   const courses = await Promise.all(
     userCoursesAndSuggestions.map((course) =>
       getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', course.course]])
