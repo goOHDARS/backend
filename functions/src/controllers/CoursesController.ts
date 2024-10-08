@@ -40,16 +40,17 @@ export type UserCourse = {
 const MAX_SEMESTER_SIZE = 16
 
 const pickRandomCourse = (
-  userCourses: UserCourse[],
-  possibleCourses: { name: string; prereq: string[] }[]
+  userCourses: string[],
+  possibleCourses: { name: string; prereq?: string[] }[]
 ) => {
   // filter possible course depending on whether it was
   // not taken and if its prereqs were taken
   const filteredChoices = possibleCourses.filter(
     (course) =>
-      !userCourses.find((el) => el.course === course.name) &&
-      course.prereq.filter((pr) => !userCourses.find((el) => el.course === pr))
-        .length === 0
+      !userCourses.find((el) => el === course.name) &&
+      (!course.prereq ||
+        course.prereq.filter((pr) => !userCourses.find((el) => el === pr))
+          .length === 0)
   )
 
   if (filteredChoices.length === 0) return undefined
@@ -104,7 +105,10 @@ export const getCoursesTool = async (userID: string) => {
     .map((req) => ({
       id: '0',
       // pick random course that has its prereqs met
-      course: pickRandomCourse(userCourses, req.course),
+      course: pickRandomCourse(
+        userCourses.map((el) => el.course),
+        req.course
+      ),
       semester: nextSemester,
       category: req.category,
       subcategory: req.subcategory,
@@ -284,8 +288,23 @@ export const getInitialCourses = async (
       filters
     )
 
-    // @TODO: except array of courses as valid so that we can add
-    // requirements that could have multiple courses
+    // update requirements with single course chosen at random
+    for (let i = 0; i < requiredCourses.length; i++) {
+      if (requiredCourses[i].course.length > 1) {
+        // find random course from options
+        const selectedCourse = pickRandomCourse(
+          requiredCourses.slice(0, i).map((el) => el.course[0]),
+          requiredCourses[i].course.map((el) => ({ name: el }))
+        )
+
+        // update course in array
+        requiredCourses[i] = {
+          ...requiredCourses[i],
+          course: selectedCourse ? [selectedCourse] : [],
+        }
+      }
+    }
+
     const courses = await Promise.all(
       requiredCourses.map((el) =>
         getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', el.course[0]]])
