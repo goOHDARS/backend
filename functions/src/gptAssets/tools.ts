@@ -22,6 +22,13 @@ export const tools: ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
+      name: 'getSuggestions',
+      description: 'get recommended courses for the user',
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'getCourseInfo',
       description: 'get the full information of a course',
       parameters: {
@@ -79,6 +86,7 @@ export const tools: ChatCompletionTool[] = [
 // a type to represent all of the possible tool calls (should match 'tools')
 type FunctionKeys =
   | 'getCourses'
+  | 'getSuggestions'
   | 'getCourseInfo'
   | 'addUserCourse'
   | 'removeUserCourse'
@@ -101,10 +109,24 @@ export const generateMessageFromToolCall = async (
     (params: AllParams) => Promise<string>
   > = {
     getCourses: async () => {
-      const briefs = await getCoursesTool(userId)
+      const briefs = (await getCoursesTool(userId)).filter(
+        // filter out suggestions
+        (el) => !el.suggestion
+      )
       return (
         'Below are the courses you are currently enrolled in.\n\n' +
         briefs.map((el) => el.shortName).join('\n') +
+        '\n\nPlease let me know if you need anything else.'
+      )
+    },
+    getSuggestions: async () => {
+      const suggestions = (await getCoursesTool(userId)).filter(
+        // keep only suggestions
+        (el) => el.suggestion
+      )
+      return (
+        'Here are some course recommendations for next semester:\n\n' +
+        suggestions.map((el) => el.shortName).join('\n') +
         '\n\nPlease let me know if you need anything else.'
       )
     },

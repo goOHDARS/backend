@@ -15,7 +15,7 @@ export type Major = {
 export type MajorRequirement = {
   id: string
   category: string
-  subcategory: string
+  subcategory?: string
   course: string[]
   priority: number
   semester: number

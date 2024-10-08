@@ -11,8 +11,10 @@ type CourseBrief = {
   shortName: string
   credits: number
   semester: number | null
+  suggestion?: boolean
   category?: string
   subcategory?: string
+  priority?: number
 }
 
 export type Course = {
@@ -32,33 +34,124 @@ export type UserCourse = {
   semester: number
   category?: string
   subcategory?: string
+  priority?: number
+}
+
+const MAX_SEMESTER_SIZE = 16
+
+const pickRandomCourse = (
+  userCourses: string[],
+  possibleCourses: { name: string; prereq?: string[] }[]
+) => {
+  // filter possible course depending on whether it was
+  // not taken and if its prereqs were taken
+  const filteredChoices = possibleCourses.filter(
+    (course) =>
+      !userCourses.find((el) => el === course.name) &&
+      (!course.prereq ||
+        course.prereq.filter((pr) => !userCourses.find((el) => el === pr))
+          .length === 0)
+  )
+
+  if (filteredChoices.length === 0) return undefined
+
+  return filteredChoices[Math.floor(Math.random() * filteredChoices.length)]
+    .name
 }
 
 export const getCoursesTool = async (userID: string) => {
+  const user = await getUser(userID)
+  const userMajor = await getMajor(user.major)
   const userCourses = await getCollection<UserCourse>(
     `${USER_COLLECTION}/${userID}/courses`
   )
 
+  // compute next valid semester
+  const nextSemester = Math.min(
+    userMajor.planned_length - 1,
+    getCurrentSemester(user.dateJoined, user.startingSemester) + 1
+  )
+
+  // get all reqs
+  const requirements = await getCollection<MajorRequirement>(
+    `${MAJOR_COLLECTION}/${userMajor.id}/requirements`
+  )
+
+  // filter reqs to only ones that have not been met
+  const remainingReqs = (
+    await Promise.all(
+      requirements
+        .filter(
+          (req) =>
+            !userCourses.find((course) => course.priority === req.priority)
+        )
+        .sort((a, b) => a.priority - b.priority)
+        // fill reqs with prereqs for each possible course
+        .map(async (req) => ({
+          ...req,
+          course: await Promise.all(
+            req.course.map(async (course) => ({
+              name: course,
+              prereq: (
+                await getDoc<Course>(COURSE_COLLECTION, [
+                  ['shortName', '==', course],
+                ])
+              ).prereq,
+            }))
+          ),
+        }))
+    )
+  )
+    .map((req) => ({
+      id: '0',
+      // pick random course that has its prereqs met
+      course: pickRandomCourse(
+        userCourses.map((el) => el.course),
+        req.course
+      ),
+      semester: nextSemester,
+      category: req.category,
+      subcategory: req.subcategory,
+      priority: req.priority,
+    }))
+    .filter((el) => el.course) as UserCourse[]
+
+  // concat suggestions to end of user courses
+  const userCoursesAndSuggestions = [...userCourses, ...remainingReqs]
+  // find the rest of the course information for each course
   const courses = await Promise.all(
-    userCourses.map((course) =>
+    userCoursesAndSuggestions.map((course) =>
       getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', course.course]])
     )
   )
 
   const courseBriefs: CourseBrief[] = []
-  for (let i = 0; i < userCourses.length; i++) {
-    const userCourse = userCourses[i]
+  let totalSemCredits = 0
+  for (let i = 0; i < userCoursesAndSuggestions.length; i++) {
+    const userCourse = userCoursesAndSuggestions[i]
     const course = courses[i]
 
-    courseBriefs.push({
+    const brief: CourseBrief = {
       id: course.id,
       fullName: course.fullName,
       shortName: course.shortName,
       credits: course.credits,
       semester: userCourse.semester,
+      suggestion: userCourse.id === '0' || undefined,
       category: userCourse.category,
       subcategory: userCourse.subcategory,
-    })
+      priority: userCourse.priority,
+    }
+
+    if (!brief.suggestion) {
+      courseBriefs.push(brief)
+      if (brief.semester === nextSemester) totalSemCredits += brief.credits
+    } else {
+      totalSemCredits += brief.credits
+      if (totalSemCredits <= MAX_SEMESTER_SIZE) {
+        courseBriefs.push(brief)
+      }
+    }
   }
 
   return courseBriefs
@@ -102,6 +195,7 @@ export const addUserCourseTool = async (
     semester: courseInfo.semester,
     category: courseInfo.category,
     subcategory: courseInfo.subcategory,
+    priority: courseInfo.priority,
   }
 
   return brief
@@ -151,6 +245,7 @@ export const queryCoursesTool = async (userID: string, search: string) => {
       semester: null,
       category: requirement?.category,
       subcategory: requirement?.subcategory,
+      priority: requirement?.priority,
     })
   }
 
@@ -193,8 +288,23 @@ export const getInitialCourses = async (
       filters
     )
 
-    // @TODO: except array of courses as valid so that we can add
-    // requirements that could have multiple courses
+    // update requirements with single course chosen at random
+    for (let i = 0; i < requiredCourses.length; i++) {
+      if (requiredCourses[i].course.length > 1) {
+        // find random course from options
+        const selectedCourse = pickRandomCourse(
+          requiredCourses.slice(0, i).map((el) => el.course[0]),
+          requiredCourses[i].course.map((el) => ({ name: el }))
+        )
+
+        // update course in array
+        requiredCourses[i] = {
+          ...requiredCourses[i],
+          course: selectedCourse ? [selectedCourse] : [],
+        }
+      }
+    }
+
     const courses = await Promise.all(
       requiredCourses.map((el) =>
         getDoc<Course>(COURSE_COLLECTION, [['shortName', '==', el.course[0]]])
@@ -214,6 +324,7 @@ export const getInitialCourses = async (
         semester: requirement.semester,
         category: requirement.category,
         subcategory: requirement.subcategory,
+        priority: requirement.priority,
       })
     }
 
@@ -237,7 +348,8 @@ export const setInitialCourses = async (
       )
     )
     await setDoc<User>(USER_COLLECTION, { ...user, onboarded: true })
-    response.status(200).send({ status: 'success' })
+    const briefs = await getCoursesTool(request.userId)
+    response.status(200).send(briefs)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
   }
@@ -249,8 +361,9 @@ export const addUserCourse = async (
 ) => {
   try {
     const courseInfo: Omit<UserCourse, 'id'> = request.body.course
-    const brief = await addUserCourseTool(request.userId, courseInfo)
-    response.status(200).send(brief)
+    await addUserCourseTool(request.userId, courseInfo)
+    const briefs = await getCoursesTool(request.userId)
+    response.status(200).send(briefs)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
   }
@@ -262,8 +375,9 @@ export const removeUserCourse = async (
 ) => {
   try {
     const courseName: string = request.body.course
-    const course = await removeUserCourseTool(request.userId, courseName)
-    response.status(200).send({ courseName: course })
+    await removeUserCourseTool(request.userId, courseName)
+    const briefs = await getCoursesTool(request.userId)
+    response.status(200).send(briefs)
   } catch (err: any) {
     response.status(500).send({ error: err.message })
   }
